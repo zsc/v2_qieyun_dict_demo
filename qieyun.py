@@ -115,8 +115,8 @@ def run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
     dict_path = Path(args.dict_path) if args.dict_path else Path(__file__).resolve().with_name("dictionary.txt")
     pron_map = load_pron_map(dict_path)
 
-    ipa_tokens: list[str] = []
-    prefix_punct = ""
+    ipa_parts: list[str] = []
+    prev_was_han = False
 
     if args.verbose:
         print(f"输入: {raw_text}", end="" if raw_text.endswith("\n") else "\n")
@@ -124,36 +124,24 @@ def run(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
         print("\n逐字对照:")
 
     for ch in converted_text:
-        pcat = punctuation_category(ch)
-        if pcat:
-            if pcat in ("Ps", "Pi"):
-                prefix_punct += ch
-            elif ipa_tokens:
-                ipa_tokens[-1] += ch
-            else:
-                ipa_tokens.append(ch)
-            if args.verbose:
-                print(f"  {ch}   -> [标点]")
-            continue
-
         if not is_han_char(ch):
+            ipa_parts.append(ch)
             if args.verbose:
-                print(f"  {ch}   -> [非汉字]")
+                label = "[标点]" if punctuation_category(ch) else "[非汉字]"
+                print(f"  {ch}   -> {label}")
+            prev_was_han = False
             continue
 
         ipas = pron_map.get(ch, [])
         primary, display = format_candidates(ipas, show_all=args.multi)
-        if prefix_punct:
-            primary = f"{prefix_punct}{primary}"
-            prefix_punct = ""
-        ipa_tokens.append(primary)
+        if prev_was_han:
+            ipa_parts.append(" ")
+        ipa_parts.append(primary)
+        prev_was_han = True
         if args.verbose:
             print(f"  {ch}   -> {display}")
 
-    if prefix_punct:
-        ipa_tokens.append(prefix_punct)
-
-    ipa_str = " ".join(ipa_tokens)
+    ipa_str = "".join(ipa_parts)
 
     if not args.verbose:
         print(f"繁体: {converted_text}", end="" if converted_text.endswith("\n") else "\n")
